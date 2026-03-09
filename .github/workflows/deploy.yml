@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -29,7 +29,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          REACT_APP_GOOGLE_CLIENT_ID: ${{ secrets.REACT_APP_GOOGLE_CLIENT_ID }}
+          REACT_APP_GOOGLE_CLIENT_ID: 359561186899-si9voh2chbu51ji41di4v5j8cqhj365q.apps.googleusercontent.com
+          REACT_APP_GOOGLE_API_KEY: 359561186899-si9voh2chbu51ji41di4v5j8cqhj365q.apps.googleusercontent.com
           CI: false
 
       - name: Deploy to GitHub Pages
