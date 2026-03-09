@@ -265,7 +265,7 @@ body::before {
 .month-cell:hover { background: var(--surface2); }
 .month-cell.today { background: rgba(124,110,240,0.08); }
 .month-cell.other-month { opacity: 0.45; }
-.month-cell.selected { background: rgba(200,169,110,0.07); }
+.month-cell.selected { background: rgba(110, 123, 200, 0.07); }
 .month-cell-day {
   font-size: 12px; font-weight: 600; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
@@ -305,7 +305,7 @@ body::before {
 .week-day-col { position: relative; background: var(--surface); border-right: 1px solid var(--border); }
 .week-day-col.today-col { background: rgba(124,110,240,0.04); }
 .week-hour-slot { height: 48px; border-bottom: 1px solid rgba(42,42,62,0.4); cursor: pointer; }
-.week-hour-slot:hover { background: rgba(200,169,110,0.04); }
+.week-hour-slot:hover { background: rgba(123, 110, 200, 0.04); }
 .week-event {
   position: absolute; left: 2px; right: 2px; border-radius: 5px;
   padding: 2px 5px; font-size: 10px; font-weight: 600; cursor: pointer;
@@ -384,7 +384,7 @@ body::before {
   transition: var(--transition); outline: none;
 }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,169,110,0.1);
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(110, 149, 200, 0.1);
 }
 .form-group textarea { resize: vertical; min-height: 74px; }
 .form-group select option { background: var(--surface2); }
@@ -396,8 +396,8 @@ body::before {
   font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
   cursor: pointer; transition: var(--transition);
 }
-.btn-primary { background: linear-gradient(135deg, var(--accent), #e8c080); color: #1a1200; }
-.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(200,169,110,0.35); }
+.btn-primary { background: linear-gradient(135deg, var(--accent), #8082e8); color: #05001a; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(110, 123, 200, 0.35); }
 .btn-secondary { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
 .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
 .btn-danger { background: var(--danger); color: white; }

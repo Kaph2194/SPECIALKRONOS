@@ -9,8 +9,10 @@ export default function LoginPage() {
     <div className="login-screen">
       <div className="login-card">
         <div className="brand-block">
-          <div className="brand-icon-big">⏰</div>
-          <div className="brand-name">Kronos</div>
+          <div className="brand-icon-big">
+            <img src={`${process.env.PUBLIC_URL}/logo.jpg`} alt="Special CAR Logo" />
+          </div>
+          <div className="brand-name">Special KRONOS</div>
           <div className="brand-sub">Agenda Inteligente</div>
         </div>
 

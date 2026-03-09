@@ -154,8 +154,9 @@ export default function CalendarPage() {
       {/* ── TOPBAR ── */}
       <div className="topbar">
         <div className="topbar-brand">
-          <div className="topbar-brand-icon">⏰</div>
-          Kronos
+          <img src={`${process.env.PUBLIC_URL}/logo.jpg`} alt="Special CAR"
+            style={{ height: 36, width: 36, borderRadius: 8, objectFit: 'cover' }} />
+          Special KRONOS
         </div>
         <div className="topbar-right">
           {syncing && (
