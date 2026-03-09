@@ -6,6 +6,26 @@ const TYPES = ['reunion', 'tarea', 'evento', 'cita'];
 const COLORS = ['#7c6ef0', '#4ecdc4', '#c8a96e', '#ff6b6b'];
 const ATT_COLORS = ['#7c6ef0', '#4ecdc4', '#c8a96e', '#ff6b6b', '#e87070', '#70c5e8'];
 
+const DURATIONS = [
+  { label: '15 minutos', minutes: 15 },
+  { label: '30 minutos', minutes: 30 },
+  { label: '45 minutos', minutes: 45 },
+  { label: '1 hora', minutes: 60 },
+  { label: '1 hora 30 min', minutes: 90 },
+  { label: '2 horas', minutes: 120 },
+  { label: '3 horas', minutes: 180 },
+  { label: '4 horas', minutes: 240 },
+  { label: 'Día completo', minutes: 480 },
+];
+
+function addMinutes(time, minutes) {
+  const [h, m] = time.split(':').map(Number);
+  const total = h * 60 + m + minutes;
+  const hh = Math.floor(total / 60) % 24;
+  const mm = total % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
 export default function EventModal({
   isOpen, onClose, initialData, selectedDate,
   onSave, onDelete, hasConflict, checkFreebusy, editMode
@@ -16,7 +36,7 @@ export default function EventModal({
   const [desc, setDesc] = useState('');
   const [date, setDate] = useState('');
   const [start, setStart] = useState('09:00');
-  const [end, setEnd] = useState('10:00');
+  const [duration, setDuration] = useState(60);
   const [location, setLocation] = useState('');
   const [notif, setNotif] = useState('both');
   const [attendees, setAttendees] = useState([]);
@@ -26,6 +46,8 @@ export default function EventModal({
   const [avail, setAvail] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  const end = addMinutes(start, duration);
+
   useEffect(() => {
     if (!isOpen) return;
     if (editMode && initialData) {
@@ -34,14 +56,21 @@ export default function EventModal({
       setDesc(initialData.desc || '');
       setDate(initialData.date || dateToStr(selectedDate));
       setStart(initialData.start || '09:00');
-      setEnd(initialData.end || '10:00');
+      if (initialData.start && initialData.end) {
+        const [sh, sm] = initialData.start.split(':').map(Number);
+        const [eh, em] = initialData.end.split(':').map(Number);
+        const diff = (eh * 60 + em) - (sh * 60 + sm);
+        setDuration(diff > 0 ? diff : 60);
+      } else {
+        setDuration(60);
+      }
       setLocation(initialData.location || '');
       setNotif(initialData.notif || 'both');
       setAttendees(initialData.attendees || []);
     } else {
       setType('reunion'); setTitle(''); setDesc('');
       setDate(dateToStr(selectedDate));
-      setStart('09:00'); setEnd('10:00');
+      setStart('09:00'); setDuration(60);
       setLocation(''); setNotif('both');
       setAttendees([]);
     }
@@ -61,7 +90,7 @@ export default function EventModal({
     const email = attendeeInput.trim().toLowerCase();
     if (!email || !email.includes('@')) return toast('Ingresa un correo válido', 'error');
     if (attendees.find(a => a.email === email)) return toast('Ya está en la lista', 'warning');
-    if (!date || !start || !end) return toast('Define fecha y hora primero', 'warning');
+    if (!date || !start) return toast('Define fecha y hora primero', 'warning');
 
     const timeMin = new Date(`${date}T${start}:00`).toISOString();
     const timeMax = new Date(`${date}T${end}:00`).toISOString();
@@ -83,8 +112,7 @@ export default function EventModal({
   async function handleSave() {
     if (!title.trim()) return toast('El título es requerido', 'error');
     if (!date) return toast('La fecha es requerida', 'error');
-    if (!start || !end) return toast('Define hora inicio y fin', 'error');
-    if (start >= end) return toast('La hora fin debe ser mayor al inicio', 'error');
+    if (!start) return toast('Define la hora de inicio', 'error');
     if (conflict) {
       toast(`⚠️ Conflicto con "${conflict.title}"`, 'error');
       return;
@@ -120,7 +148,6 @@ export default function EventModal({
         </div>
 
         <div className="modal-body">
-          {/* Conflict alert */}
           {conflict && (
             <div className="conflict-alert">
               <div className="conflict-alert-title">⚠️ Conflicto de Horario</div>
@@ -128,7 +155,6 @@ export default function EventModal({
             </div>
           )}
 
-          {/* Type selector */}
           <div className="type-selector">
             {TYPES.map((t, i) => (
               <div
@@ -160,13 +186,21 @@ export default function EventModal({
 
           <div className="time-row">
             <div className="form-group">
-              <label>Inicio *</label>
+              <label>Hora de inicio *</label>
               <input type="time" value={start} onChange={e => setStart(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Fin *</label>
-              <input type="time" value={end} onChange={e => setEnd(e.target.value)} />
+              <label>Duración</label>
+              <select value={duration} onChange={e => setDuration(Number(e.target.value))}>
+                {DURATIONS.map(d => (
+                  <option key={d.minutes} value={d.minutes}>{d.label}</option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: -8, marginBottom: 14, paddingLeft: 2 }}>
+            🕐 Finaliza a las <strong style={{ color: 'var(--accent3)' }}>{end}</strong>
           </div>
 
           {avail && (
@@ -180,7 +214,6 @@ export default function EventModal({
             <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Sala, dirección, Google Meet..." />
           </div>
 
-          {/* Attendees */}
           <div className="form-group">
             <label>Invitados / Participantes</label>
             <div className="attendee-list">
@@ -218,9 +251,11 @@ export default function EventModal({
           <div className="form-group">
             <label>Notificaciones (Google Calendar)</label>
             <select value={notif} onChange={e => setNotif(e.target.value)}>
+              <option value="all">1 día + 4 horas + 30 min antes</option>
               <option value="both">1 día antes + 4 horas antes</option>
               <option value="day">Solo 1 día antes</option>
               <option value="hours">Solo 4 horas antes</option>
+              <option value="30min">Solo 30 minutos antes</option>
               <option value="none">Sin notificaciones</option>
             </select>
           </div>
