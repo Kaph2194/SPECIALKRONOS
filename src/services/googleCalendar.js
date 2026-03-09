@@ -103,11 +103,9 @@ function buildEventBody(event) {
 
   const reminders = [];
   if (event.notif === 'all' || event.notif === 'both' || event.notif === 'day') {
-    reminders.push({ method: 'email', minutes: 24 * 60 });
     reminders.push({ method: 'popup', minutes: 24 * 60 });
   }
   if (event.notif === 'all' || event.notif === 'both' || event.notif === 'hours') {
-    reminders.push({ method: 'email', minutes: 4 * 60 });
     reminders.push({ method: 'popup', minutes: 4 * 60 });
   }
   if (event.notif === 'all' || event.notif === '30min') {
