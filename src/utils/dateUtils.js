@@ -44,5 +44,5 @@ export function typeLabel(type) {
 }
 
 export function typeEmoji(type) {
-  return { reunion: '🤝', tarea: '✅', evento: '🎉', cita: '🩺' }[type] || '📅';
+  return { reunion: '👔', tarea: '📌', evento: '🏢', cita: '🚗'}[type] || '🗓️';
 }
