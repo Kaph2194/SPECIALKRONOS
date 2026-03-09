@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.css": "/static/css/main.5f699971.css",
-    "main.js": "/static/js/main.769ef3e6.js",
-    "index.html": "/index.html",
-    "main.5f699971.css.map": "/static/css/main.5f699971.css.map",
-    "main.769ef3e6.js.map": "/static/js/main.769ef3e6.js.map"
+    "main.css": "/SPECIALKRONOS/static/css/main.5f699971.css",
+    "main.js": "/SPECIALKRONOS/static/js/main.769ef3e6.js",
+    "index.html": "/SPECIALKRONOS/index.html",
+    "main.5f699971.css.map": "/SPECIALKRONOS/static/css/main.5f699971.css.map",
+    "main.769ef3e6.js.map": "/SPECIALKRONOS/static/js/main.769ef3e6.js.map"
   },
   "entrypoints": [
     "static/css/main.5f699971.css",
