@@ -154,9 +154,12 @@ export default function CalendarPage() {
       {/* ── TOPBAR ── */}
       <div className="topbar">
         <div className="topbar-brand">
-          <img src={`${process.env.PUBLIC_URL}/logo.jpg`} alt="Special CAR"
-            style={{ height: 36, width: 36, borderRadius: 8, objectFit: 'cover' }} />
-          Special KRONOS
+          <img
+            src={`${process.env.PUBLIC_URL}/logo.jpg`}
+            alt="Special CAR"
+            style={{ height: 36, width: 36, borderRadius: 8, objectFit: 'cover' }}
+          />
+          Special CAR
         </div>
         <div className="topbar-right">
           {syncing && (
@@ -300,6 +303,24 @@ export default function CalendarPage() {
           onDelete={async (gid) => { await handleDelete(gid); setDetailEvent(null); }}
         />
       )}
+
+      {/* ── MOBILE FAB ── */}
+      <button className="mobile-fab" onClick={() => openNew()}>+</button>
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <div className="mobile-bottom-nav">
+        {[
+          { id: 'month', icon: '📅', label: 'Mes' },
+          { id: 'week', icon: '📆', label: 'Semana' },
+          { id: 'day', icon: '📋', label: 'Día' },
+          { id: 'list', icon: '📝', label: 'Lista' },
+        ].map(v => (
+          <div key={v.id} className={`mobile-nav-item${view === v.id ? ' active' : ''}`} onClick={() => setView(v.id)}>
+            <span className="mobile-nav-item-icon">{v.icon}</span>
+            <span>{v.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
