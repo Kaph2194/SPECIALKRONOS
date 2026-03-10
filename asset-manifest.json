@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/SPECIALKRONOS/static/css/main.31b815fd.css",
-    "main.js": "/SPECIALKRONOS/static/js/main.7a44bed1.js",
+    "main.js": "/SPECIALKRONOS/static/js/main.b03f139a.js",
     "index.html": "/SPECIALKRONOS/index.html",
     "main.31b815fd.css.map": "/SPECIALKRONOS/static/css/main.31b815fd.css.map",
-    "main.7a44bed1.js.map": "/SPECIALKRONOS/static/js/main.7a44bed1.js.map"
+    "main.b03f139a.js.map": "/SPECIALKRONOS/static/js/main.b03f139a.js.map"
   },
   "entrypoints": [
     "static/css/main.31b815fd.css",
-    "static/js/main.7a44bed1.js"
+    "static/js/main.b03f139a.js"
   ]
 }
