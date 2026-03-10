@@ -1,65 +1,64 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { useGoogleLogin } from '@react-oauth/google';
-import axios from 'axios';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '../services/supabaseClient';
 
 const AuthContext = createContext(null);
 
+const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+].join(' ');
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);        // { name, email, picture, accessToken }
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore session from localStorage
+  // Construir objeto user desde sesión de Supabase
+  function buildUser(session) {
+    if (!session) return null;
+    return {
+      name: session.user.user_metadata?.full_name || session.user.email,
+      email: session.user.email,
+      picture: session.user.user_metadata?.avatar_url || null,
+      accessToken: session.provider_token, // token de Google Calendar
+      expiresAt: session.expires_at * 1000,
+    };
+  }
+
   useEffect(() => {
-    const saved = localStorage.getItem('kronos_user');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Check token expiry
-        if (parsed.expiresAt && Date.now() < parsed.expiresAt) {
-          setUser(parsed);
-        } else {
-          localStorage.removeItem('kronos_user');
-        }
-      } catch (_) {
-        localStorage.removeItem('kronos_user');
-      }
-    }
-    setLoading(false);
+    // Obtener sesión actual al cargar
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(buildUser(session));
+      setLoading(false);
+    });
+
+    // Escuchar cambios de sesión (login, logout, refresh automático)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(buildUser(session));
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const loginWithGoogle = useGoogleLogin({
-    scope: [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events',
-      'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/userinfo.profile',
-    ].join(' '),
-    onSuccess: async (tokenResponse) => {
-      try {
-        // Fetch user profile
-        const profile = await axios.get(
-          'https://www.googleapis.com/oauth2/v3/userinfo',
-          { headers: { Authorization: `Bearer ${tokenResponse.access_token}` } }
-        );
-        const userData = {
-          name: profile.data.name,
-          email: profile.data.email,
-          picture: profile.data.picture,
-          accessToken: tokenResponse.access_token,
-          expiresAt: Date.now() + (tokenResponse.expires_in || 3600) * 1000,
-        };
-        setUser(userData);
-        localStorage.setItem('kronos_user', JSON.stringify(userData));
-      } catch (err) {
-        console.error('Error fetching profile:', err);
-      }
-    },
-    onError: (err) => console.error('Google login error:', err),
-  });
+  const loginWithGoogle = useCallback(async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        scopes: GOOGLE_SCOPES,
+        redirectTo: 'https://kaph2194.github.io/SPECIALKRONOS',
+        queryParams: {
+          access_type: 'offline',  // obtiene refresh_token
+          prompt: 'consent',
+        },
+      },
+    });
+  }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('kronos_user');
   }, []);
 
   return (

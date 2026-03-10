@@ -1,6 +1,4 @@
-import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../hooks/useAuth';
-import axios from 'axios';
 
 export default function LoginPage() {
   const { loginWithGoogle } = useAuth();
@@ -12,7 +10,7 @@ export default function LoginPage() {
           <div className="brand-icon-big">
             <img src={`${process.env.PUBLIC_URL}/logo.jpg`} alt="Special CAR Logo" />
           </div>
-          <div className="brand-name">Special KRONOS</div>
+          <div className="brand-name">Special CAR</div>
           <div className="brand-sub">Agenda Inteligente</div>
         </div>
 

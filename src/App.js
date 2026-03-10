@@ -2,6 +2,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ToastProvider } from './components/Toast';
 import LoginPage from './pages/LoginPage';
 import CalendarPage from './pages/CalendarPage';
+import './styles/global.css';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -10,7 +11,7 @@ function AppContent() {
     return (
       <div className="loading-screen">
         <div className="spinner" />
-        <div className="loading-text">Cargando Kronos...</div>
+        <div className="loading-text">Cargando Special CAR...</div>
       </div>
     );
   }
