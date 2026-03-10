@@ -12,6 +12,7 @@ const ATT_COLORS = [
   "#e87070",
   "#70c5e8",
 ];
+const MAPS_API_KEY = "AIzaSyD384LajhnTFS4KSIioj_ASgeFTY1Tr2PU";
 
 const DURATIONS = [
   { label: "15 minutos", minutes: 15 },
@@ -33,7 +34,6 @@ function addMinutes(time, minutes) {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
-// Genera un Meet link con formato real de Google Meet
 function generateMeetLink() {
   const chars = "abcdefghijklmnopqrstuvwxyz";
   const seg = (n) =>
@@ -44,18 +44,29 @@ function generateMeetLink() {
   return `https://meet.google.com/${seg(3)}-${seg(4)}-${seg(3)}`;
 }
 
-// Búsqueda de lugares con OpenStreetMap Nominatim
-async function searchPlaces(query) {
-  if (!query || query.length < 3) return [];
-  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=co&accept-language=es`;
-  const res = await fetch(url, { headers: { "Accept-Language": "es" } });
-  const data = await res.json();
-  return data.map((p) => ({
-    name: p.display_name,
-    short: p.display_name.split(",").slice(0, 2).join(",").trim(),
-    lat: p.lat,
-    lon: p.lon,
-  }));
+// Carga el script de Google Maps solo una vez
+function loadGoogleMaps() {
+  return new Promise((resolve) => {
+    if (window.google?.maps?.places) {
+      resolve();
+      return;
+    }
+    if (document.getElementById("google-maps-script")) {
+      const check = setInterval(() => {
+        if (window.google?.maps?.places) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 100);
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "google-maps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_API_KEY}&libraries=places&language=es`;
+    script.async = true;
+    script.onload = resolve;
+    document.head.appendChild(script);
+  });
 }
 
 export default function EventModal({
@@ -85,17 +96,34 @@ export default function EventModal({
   const [conflict, setConflict] = useState(null);
   const [avail, setAvail] = useState(null);
   const [saving, setSaving] = useState(false);
-
-  // Búsqueda de lugares
-  const [placeQuery, setPlaceQuery] = useState("");
-  const [placeResults, setPlaceResults] = useState([]);
-  const [searchingPlaces, setSearchingPlaces] = useState(false);
-  const searchTimer = useRef(null);
-
-  // Meet
   const [generatingMeet, setGeneratingMeet] = useState(false);
 
+  const placeInputRef = useRef(null);
+  const autocompleteRef = useRef(null);
+
   const end = addMinutes(start, duration);
+
+  // Inicializar Google Places Autocomplete
+  useEffect(() => {
+    if (locationType !== "physical" || !isOpen) return;
+    loadGoogleMaps().then(() => {
+      if (!placeInputRef.current) return;
+      if (autocompleteRef.current) return;
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(
+        placeInputRef.current,
+        { language: "es", fields: ["formatted_address", "name", "geometry"] },
+      );
+      autocompleteRef.current.addListener("place_changed", () => {
+        const place = autocompleteRef.current.getPlace();
+        const addr = place.formatted_address || place.name || "";
+        setLocation(addr);
+        if (placeInputRef.current) placeInputRef.current.value = addr;
+      });
+    });
+    return () => {
+      autocompleteRef.current = null;
+    };
+  }, [locationType, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -133,8 +161,7 @@ export default function EventModal({
     setAttendeeMsg(null);
     setConflict(null);
     setAvail(null);
-    setPlaceQuery("");
-    setPlaceResults([]);
+    autocompleteRef.current = null;
   }, [isOpen, editMode, initialData, selectedDate]);
 
   const checkAvailability = useCallback(() => {
@@ -151,33 +178,10 @@ export default function EventModal({
     checkAvailability();
   }, [date, start, end, checkAvailability]);
 
-  // Búsqueda con debounce
-  useEffect(() => {
-    if (locationType !== "physical") return;
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (placeQuery.length < 3) {
-      setPlaceResults([]);
-      return;
-    }
-    setSearchingPlaces(true);
-    searchTimer.current = setTimeout(async () => {
-      const results = await searchPlaces(placeQuery);
-      setPlaceResults(results);
-      setSearchingPlaces(false);
-    }, 500);
-  }, [placeQuery, locationType]);
-
-  function handleSelectPlace(place) {
-    setLocation(place.short);
-    setPlaceQuery(place.short);
-    setPlaceResults([]);
-  }
-
   function handleGenerateMeet() {
     setGeneratingMeet(true);
     setTimeout(() => {
-      const link = generateMeetLink();
-      setLocation(link);
+      setLocation(generateMeetLink());
       setGeneratingMeet(false);
       toast("✓ Link de Google Meet generado", "success");
     }, 800);
@@ -190,14 +194,11 @@ export default function EventModal({
     if (attendees.find((a) => a.email === email))
       return toast("Ya está en la lista", "warning");
     if (!date || !start) return toast("Define fecha y hora primero", "warning");
-
     const timeMin = new Date(`${date}T${start}:00`).toISOString();
     const timeMax = new Date(`${date}T${end}:00`).toISOString();
     const fb = await checkFreebusy([email], timeMin, timeMax);
     const busy = fb[email]?.busy?.length > 0;
-
-    const newAtt = { email, status: "pending", busy };
-    setAttendees((prev) => [...prev, newAtt]);
+    setAttendees((prev) => [...prev, { email, status: "pending", busy }]);
     setAttendeeInput("");
     if (busy) {
       setAttendeeMsg({
@@ -394,8 +395,7 @@ export default function EventModal({
                   onClick={() => {
                     setLocationType(opt.id);
                     setLocation("");
-                    setPlaceQuery("");
-                    setPlaceResults([]);
+                    autocompleteRef.current = null;
                   }}
                   style={{
                     flex: 1,
@@ -425,82 +425,15 @@ export default function EventModal({
               ))}
             </div>
 
-            {/* PRESENCIAL — búsqueda OpenStreetMap */}
+            {/* PRESENCIAL — Google Places Autocomplete */}
             {locationType === "physical" && (
-              <div style={{ position: "relative" }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <input
-                    value={placeQuery}
-                    onChange={(e) => setPlaceQuery(e.target.value)}
-                    placeholder="🔍 Buscar lugar, dirección..."
-                    style={{ flex: 1 }}
-                  />
-                  {searchingPlaces && (
-                    <div
-                      className="spinner"
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderWidth: 2,
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Resultados de búsqueda */}
-                {placeResults.length > 0 && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      zIndex: 100,
-                      background: "var(--surface)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 8,
-                      overflow: "hidden",
-                      marginTop: 4,
-                      boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-                    }}
-                  >
-                    {placeResults.map((p, i) => (
-                      <div
-                        key={i}
-                        onClick={() => handleSelectPlace(p)}
-                        style={{
-                          padding: "10px 14px",
-                          cursor: "pointer",
-                          fontSize: 12,
-                          borderBottom: "1px solid var(--border)",
-                          transition: "background 0.15s",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = "var(--surface2)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = "transparent")
-                        }
-                      >
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            color: "var(--text)",
-                            marginBottom: 2,
-                          }}
-                        >
-                          📍 {p.short}
-                        </div>
-                        <div style={{ color: "var(--text2)", fontSize: 11 }}>
-                          {p.name}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Lugar seleccionado */}
+              <div>
+                <input
+                  ref={placeInputRef}
+                  defaultValue={location}
+                  placeholder="🔍 Buscar lugar o dirección..."
+                  style={{ width: "100%" }}
+                />
                 {location && (
                   <div
                     style={{
@@ -518,12 +451,16 @@ export default function EventModal({
                   >
                     <span>📍 {location}</span>
                     <a
-                      href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(location)}`}
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: "var(--accent3)", fontSize: 11 }}
+                      style={{
+                        color: "var(--accent3)",
+                        fontSize: 11,
+                        textDecoration: "none",
+                      }}
                     >
-                      Ver mapa ↗
+                      Ver en Maps ↗
                     </a>
                   </div>
                 )}
@@ -534,9 +471,7 @@ export default function EventModal({
             {locationType === "virtual" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {!location ? (
-                  <div
-                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                  >
+                  <>
                     <button
                       onClick={handleGenerateMeet}
                       disabled={generatingMeet}
@@ -581,7 +516,7 @@ export default function EventModal({
                       onChange={(e) => setLocation(e.target.value)}
                       placeholder="https://meet.google.com/xxx-xxxx-xxx"
                     />
-                  </div>
+                  </>
                 ) : (
                   <div
                     style={{
