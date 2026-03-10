@@ -44,27 +44,29 @@ function generateMeetLink() {
   return `https://meet.google.com/${seg(3)}-${seg(4)}-${seg(3)}`;
 }
 
-// Carga el script de Google Maps solo una vez
+// Carga el script de Google Maps (nueva API)
 function loadGoogleMaps() {
   return new Promise((resolve) => {
-    if (window.google?.maps?.places) {
+    if (window.google?.maps?.places?.PlaceAutocompleteElement) {
       resolve();
       return;
     }
     if (document.getElementById("google-maps-script")) {
       const check = setInterval(() => {
-        if (window.google?.maps?.places) {
+        if (window.google?.maps?.places?.PlaceAutocompleteElement) {
           clearInterval(check);
           resolve();
         }
       }, 100);
       return;
     }
+    // Importmap bootstrap para nueva Places API
     const script = document.createElement("script");
     script.id = "google-maps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_API_KEY}&libraries=places&language=es`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_API_KEY}&libraries=places&v=beta&language=es&loading=async`;
     script.async = true;
-    script.onload = resolve;
+    script.defer = true;
+    script.onload = () => setTimeout(resolve, 300);
     document.head.appendChild(script);
   });
 }
@@ -103,24 +105,52 @@ export default function EventModal({
 
   const end = addMinutes(start, duration);
 
-  // Inicializar Google Places Autocomplete
+  // Inicializar Google Places con nueva PlaceAutocompleteElement
   useEffect(() => {
     if (locationType !== "physical" || !isOpen) return;
+    let widget = null;
     loadGoogleMaps().then(() => {
-      if (!placeInputRef.current) return;
-      if (autocompleteRef.current) return;
-      autocompleteRef.current = new window.google.maps.places.Autocomplete(
-        placeInputRef.current,
-        { language: "es", fields: ["formatted_address", "name", "geometry"] },
-      );
-      autocompleteRef.current.addListener("place_changed", () => {
-        const place = autocompleteRef.current.getPlace();
-        const addr = place.formatted_address || place.name || "";
-        setLocation(addr);
-        if (placeInputRef.current) placeInputRef.current.value = addr;
-      });
+      const container = document.getElementById("place-autocomplete-container");
+      if (!container || autocompleteRef.current) return;
+      try {
+        widget = new window.google.maps.places.PlaceAutocompleteElement({
+          componentRestrictions: { country: ["co"] },
+          language: "es",
+        });
+        widget.style.cssText = `
+          width: 100%;
+          --gmp-mat-color-primary: #4A6FCA;
+          --gmp-mat-shape-medium: 8px;
+          font-family: inherit;
+        `;
+        container.appendChild(widget);
+        autocompleteRef.current = widget;
+        widget.addEventListener("gmp-placeselect", async (e) => {
+          const place = e.placePrediction.toPlace();
+          await place.fetchFields({
+            fields: ["displayName", "formattedAddress"],
+          });
+          const addr = place.formattedAddress || place.displayName?.text || "";
+          setLocation(addr);
+        });
+      } catch (err) {
+        // Fallback a Autocomplete clásico si PlaceAutocompleteElement no está disponible
+        if (!placeInputRef.current) return;
+        const ac = new window.google.maps.places.Autocomplete(
+          placeInputRef.current,
+          { language: "es", fields: ["formatted_address", "name"] },
+        );
+        autocompleteRef.current = ac;
+        ac.addListener("place_changed", () => {
+          const place = ac.getPlace();
+          const addr = place.formatted_address || place.name || "";
+          setLocation(addr);
+          if (placeInputRef.current) placeInputRef.current.value = addr;
+        });
+      }
     });
     return () => {
+      if (widget && widget.parentNode) widget.parentNode.removeChild(widget);
       autocompleteRef.current = null;
     };
   }, [locationType, isOpen]);
@@ -425,14 +455,12 @@ export default function EventModal({
               ))}
             </div>
 
-            {/* PRESENCIAL — Google Places Autocomplete */}
+            {/* PRESENCIAL — Google Places nueva API */}
             {locationType === "physical" && (
               <div>
-                <input
-                  ref={placeInputRef}
-                  defaultValue={location}
-                  placeholder="🔍 Buscar lugar o dirección..."
-                  style={{ width: "100%" }}
+                <div
+                  id="place-autocomplete-container"
+                  style={{ width: "100%", minHeight: 44 }}
                 />
                 {location && (
                   <div
