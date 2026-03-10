@@ -1,54 +1,61 @@
-// Service Worker - Special CAR
+// Service Worker - Special CAR Kronos
 
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (e) => e.waitUntil(clients.claim()));
+self.addEventListener("install", () => {
+  console.log("[SW] Instalado");
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (e) => {
+  console.log("[SW] Activado");
+  e.waitUntil(clients.claim());
+});
 
 self.addEventListener("push", (event) => {
-  if (!event.data) return;
+  console.log("[SW] Push recibido:", event.data?.text());
 
-  let data;
+  let data = { title: "Special CAR", body: "Tienes un evento próximo" };
   try {
-    data = event.data.json();
-  } catch {
-    data = { title: "Special CAR", body: event.data.text() };
+    if (event.data) data = event.data.json();
+  } catch (e) {
+    if (event.data) data.body = event.data.text();
   }
 
-  const options = {
-    body: data.body || "",
-    icon: "/SPECIALKRONOS/logo.jpg",
-    badge: "/SPECIALKRONOS/logo.jpg",
-    vibrate: [300, 100, 300, 100, 300],
-    sound: "/SPECIALKRONOS/notif.mp3", // sonido en Android
-    data: data.data || {},
-    tag: data.tag || "specialcar-notif", // agrupa notificaciones del mismo evento
-    renotify: true, // suena aunque ya exista una con el mismo tag
-    requireInteraction: false,
-    actions: [
-      { action: "open", title: "📅 Ver evento" },
-      { action: "close", title: "Cerrar" },
-    ],
-  };
-
   event.waitUntil(
-    self.registration.showNotification(data.title || "Special CAR", options),
+    self.registration.showNotification(data.title || "Special CAR", {
+      body: data.body || "",
+      icon: "/SPECIALKRONOS/logo.jpg",
+      badge: "/SPECIALKRONOS/logo.jpg",
+      vibrate: [300, 100, 300],
+      tag: data.tag || "specialcar",
+      renotify: true,
+      data: data.data || { url: "https://kaph2194.github.io/SPECIALKRONOS" },
+      actions: [
+        { action: "open", title: "📅 Ver evento" },
+        { action: "close", title: "Cerrar" },
+      ],
+    }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
+  console.log("[SW] Notificación clickeada:", event.action);
   event.notification.close();
+
   if (event.action === "close") return;
 
   const url =
     event.notification.data?.url || "https://kaph2194.github.io/SPECIALKRONOS";
-
   event.waitUntil(
     clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((list) => {
         for (const client of list) {
-          if (client.url === url && "focus" in client) return client.focus();
+          if (client.url.includes("SPECIALKRONOS") && "focus" in client)
+            return client.focus();
         }
-        if (clients.openWindow) return clients.openWindow(url);
+        return clients.openWindow(url);
       }),
   );
 });
+
+// Sin listener de message para evitar el error de channel closed
