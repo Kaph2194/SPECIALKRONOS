@@ -10,11 +10,13 @@ import WeekView from '../components/views/WeekView';
 import DayView from '../components/views/DayView';
 import ListView from '../components/views/ListView';
 import { MONTHS_ES, DAYS_ES, getMondayOfWeek, dateToStr } from '../utils/dateUtils';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const NOTIF_KEY = 'kronos_notifs_v2';
 
 export default function CalendarPage() {
   const { user, logout } = useAuth();
+  const { permission, subscribed, subscribe, unsubscribe } = usePushNotifications(user?.email);
   const toast = useToast();
   const { events, syncing, error, loadEvents, createEvent, updateEvent, deleteEvent, checkFreebusy, hasConflict } = useCalendar();
 
@@ -173,6 +175,23 @@ export default function CalendarPage() {
               ✓ Google Calendar
             </div>
           )}
+
+          {/* Push notifications button */}
+          <div
+            onClick={subscribed ? unsubscribe : subscribe}
+            title={subscribed ? 'Desactivar notificaciones push' : 'Activar notificaciones push'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 12px', borderRadius: 20, cursor: 'pointer',
+              fontSize: 11, fontWeight: 700,
+              background: subscribed ? 'rgba(78,205,100,0.1)' : 'rgba(74,111,202,0.1)',
+              border: `1px solid ${subscribed ? 'rgba(78,205,100,0.3)' : 'rgba(74,111,202,0.3)'}`,
+              color: subscribed ? '#4ecd64' : '#6b8fd4',
+              transition: 'all 0.2s',
+            }}
+          >
+            {subscribed ? '🔔 Push ON' : '🔕 Push OFF'}
+          </div>
 
           {/* Notif button */}
           <div className="notif-btn" onClick={() => setNotifPanelOpen(p => !p)}>
