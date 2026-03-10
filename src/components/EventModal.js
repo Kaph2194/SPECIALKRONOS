@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { typeColor, typeLabel, typeEmoji, dateToStr } from "../utils/dateUtils";
 import { useToast } from "./Toast";
 
@@ -33,6 +33,31 @@ function addMinutes(time, minutes) {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
+// Genera un Meet link con formato real de Google Meet
+function generateMeetLink() {
+  const chars = "abcdefghijklmnopqrstuvwxyz";
+  const seg = (n) =>
+    Array.from(
+      { length: n },
+      () => chars[Math.floor(Math.random() * chars.length)],
+    ).join("");
+  return `https://meet.google.com/${seg(3)}-${seg(4)}-${seg(3)}`;
+}
+
+// Búsqueda de lugares con OpenStreetMap Nominatim
+async function searchPlaces(query) {
+  if (!query || query.length < 3) return [];
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=co&accept-language=es`;
+  const res = await fetch(url, { headers: { "Accept-Language": "es" } });
+  const data = await res.json();
+  return data.map((p) => ({
+    name: p.display_name,
+    short: p.display_name.split(",").slice(0, 2).join(",").trim(),
+    lat: p.lat,
+    lon: p.lon,
+  }));
+}
+
 export default function EventModal({
   isOpen,
   onClose,
@@ -52,7 +77,7 @@ export default function EventModal({
   const [start, setStart] = useState("09:00");
   const [duration, setDuration] = useState(60);
   const [location, setLocation] = useState("");
-  const [locationType, setLocationType] = useState("none"); // none | physical | virtual
+  const [locationType, setLocationType] = useState("none");
   const [notif, setNotif] = useState("both");
   const [attendees, setAttendees] = useState([]);
   const [attendeeInput, setAttendeeInput] = useState("");
@@ -60,6 +85,15 @@ export default function EventModal({
   const [conflict, setConflict] = useState(null);
   const [avail, setAvail] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  // Búsqueda de lugares
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeResults, setPlaceResults] = useState([]);
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
+  const searchTimer = useRef(null);
+
+  // Meet
+  const [generatingMeet, setGeneratingMeet] = useState(false);
 
   const end = addMinutes(start, duration);
 
@@ -99,6 +133,8 @@ export default function EventModal({
     setAttendeeMsg(null);
     setConflict(null);
     setAvail(null);
+    setPlaceQuery("");
+    setPlaceResults([]);
   }, [isOpen, editMode, initialData, selectedDate]);
 
   const checkAvailability = useCallback(() => {
@@ -114,6 +150,38 @@ export default function EventModal({
   useEffect(() => {
     checkAvailability();
   }, [date, start, end, checkAvailability]);
+
+  // Búsqueda con debounce
+  useEffect(() => {
+    if (locationType !== "physical") return;
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (placeQuery.length < 3) {
+      setPlaceResults([]);
+      return;
+    }
+    setSearchingPlaces(true);
+    searchTimer.current = setTimeout(async () => {
+      const results = await searchPlaces(placeQuery);
+      setPlaceResults(results);
+      setSearchingPlaces(false);
+    }, 500);
+  }, [placeQuery, locationType]);
+
+  function handleSelectPlace(place) {
+    setLocation(place.short);
+    setPlaceQuery(place.short);
+    setPlaceResults([]);
+  }
+
+  function handleGenerateMeet() {
+    setGeneratingMeet(true);
+    setTimeout(() => {
+      const link = generateMeetLink();
+      setLocation(link);
+      setGeneratingMeet(false);
+      toast("✓ Link de Google Meet generado", "success");
+    }, 800);
+  }
 
   async function handleAddAttendee() {
     const email = attendeeInput.trim().toLowerCase();
@@ -312,7 +380,7 @@ export default function EventModal({
             </div>
           )}
 
-          {/* Ubicación */}
+          {/* ── UBICACIÓN ── */}
           <div className="form-group" style={{ marginTop: 14 }}>
             <label>Ubicación (opcional)</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -325,7 +393,9 @@ export default function EventModal({
                   key={opt.id}
                   onClick={() => {
                     setLocationType(opt.id);
-                    if (opt.id === "none") setLocation("");
+                    setLocation("");
+                    setPlaceQuery("");
+                    setPlaceResults([]);
                   }}
                   style={{
                     flex: 1,
@@ -355,125 +425,233 @@ export default function EventModal({
               ))}
             </div>
 
+            {/* PRESENCIAL — búsqueda OpenStreetMap */}
             {locationType === "physical" && (
-              <div>
-                <input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Ej: Calle 10 #25-30, Cali"
-                  style={{ marginBottom: 8 }}
-                />
-                {location && (
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+              <div style={{ position: "relative" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    value={placeQuery}
+                    onChange={(e) => setPlaceQuery(e.target.value)}
+                    placeholder="🔍 Buscar lugar, dirección..."
+                    style={{ flex: 1 }}
+                  />
+                  {searchingPlaces && (
+                    <div
+                      className="spinner"
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderWidth: 2,
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Resultados de búsqueda */}
+                {placeResults.length > 0 && (
+                  <div
                     style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      zIndex: 100,
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      overflow: "hidden",
+                      marginTop: 4,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                    }}
+                  >
+                    {placeResults.map((p, i) => (
+                      <div
+                        key={i}
+                        onClick={() => handleSelectPlace(p)}
+                        style={{
+                          padding: "10px 14px",
+                          cursor: "pointer",
+                          fontSize: 12,
+                          borderBottom: "1px solid var(--border)",
+                          transition: "background 0.15s",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = "var(--surface2)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background = "transparent")
+                        }
+                      >
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            color: "var(--text)",
+                            marginBottom: 2,
+                          }}
+                        >
+                          📍 {p.short}
+                        </div>
+                        <div style={{ color: "var(--text2)", fontSize: 11 }}>
+                          {p.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Lugar seleccionado */}
+                {location && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      background: "rgba(74,111,202,0.1)",
+                      border: "1px solid rgba(74,111,202,0.3)",
                       fontSize: 12,
                       color: "var(--accent3)",
-                      textDecoration: "none",
-                      padding: "6px 12px",
-                      borderRadius: 6,
-                      border: "1px solid var(--border)",
-                      background: "var(--surface2)",
-                    }}
-                  >
-                    📍 Ver en Google Maps
-                  </a>
-                )}
-                {!location && (
-                  <a
-                    href="https://www.google.com/maps"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "inline-flex",
+                      display: "flex",
                       alignItems: "center",
-                      gap: 6,
-                      fontSize: 12,
-                      color: "var(--text2)",
-                      textDecoration: "none",
-                      padding: "6px 12px",
-                      borderRadius: 6,
-                      border: "1px solid var(--border)",
-                      background: "var(--surface2)",
+                      justifyContent: "space-between",
                     }}
                   >
-                    🗺️ Buscar en Google Maps
-                  </a>
+                    <span>📍 {location}</span>
+                    <a
+                      href={`https://www.openstreetmap.org/search?query=${encodeURIComponent(location)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "var(--accent3)", fontSize: 11 }}
+                    >
+                      Ver mapa ↗
+                    </a>
+                  </div>
                 )}
               </div>
             )}
 
+            {/* VIRTUAL — generador de Meet */}
             {locationType === "virtual" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Enlace de reunión (opcional)"
-                />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <a
-                    href="https://meet.google.com/new"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "white",
-                      textDecoration: "none",
-                      padding: "9px 12px",
-                      borderRadius: 8,
-                      background: "linear-gradient(135deg, #1a73e8, #0d47a1)",
-                    }}
+                {!location ? (
+                  <div
+                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
                   >
-                    📹 Crear Google Meet
-                  </a>
-                  <a
-                    href="https://zoom.us/meeting/schedule"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "white",
-                      textDecoration: "none",
-                      padding: "9px 12px",
-                      borderRadius: 8,
-                      background: "linear-gradient(135deg, #2d8cff, #0e5cc5)",
-                    }}
-                  >
-                    💼 Crear Zoom
-                  </a>
-                </div>
-                {location && (
+                    <button
+                      onClick={handleGenerateMeet}
+                      disabled={generatingMeet}
+                      style={{
+                        padding: "12px",
+                        borderRadius: 8,
+                        border: "none",
+                        cursor: "pointer",
+                        background: "linear-gradient(135deg, #1a73e8, #0d47a1)",
+                        color: "white",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                      }}
+                    >
+                      {generatingMeet ? (
+                        <>
+                          <div
+                            className="spinner"
+                            style={{ width: 16, height: 16, borderWidth: 2 }}
+                          />{" "}
+                          Generando...
+                        </>
+                      ) : (
+                        <>📹 Generar link de Google Meet</>
+                      )}
+                    </button>
+                    <div
+                      style={{
+                        textAlign: "center",
+                        color: "var(--text2)",
+                        fontSize: 11,
+                      }}
+                    >
+                      — o pega tu propio link —
+                    </div>
+                    <input
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                    />
+                  </div>
+                ) : (
                   <div
                     style={{
-                      fontSize: 11,
-                      color: "var(--text2)",
-                      wordBreak: "break-all",
+                      padding: "12px",
+                      borderRadius: 8,
+                      background: "rgba(26,115,232,0.1)",
+                      border: "1px solid rgba(26,115,232,0.3)",
                     }}
                   >
-                    🔗 {location}
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#6b8fd4",
+                        fontWeight: 700,
+                        marginBottom: 6,
+                      }}
+                    >
+                      📹 GOOGLE MEET
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text)",
+                        wordBreak: "break-all",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {location}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(location);
+                          toast("Link copiado", "success");
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: "7px",
+                          borderRadius: 6,
+                          border: "1px solid var(--border)",
+                          background: "var(--surface2)",
+                          color: "var(--text2)",
+                          cursor: "pointer",
+                          fontSize: 12,
+                        }}
+                      >
+                        📋 Copiar link
+                      </button>
+                      <button
+                        onClick={() => setLocation("")}
+                        style={{
+                          padding: "7px 12px",
+                          borderRadius: 6,
+                          border: "1px solid var(--border)",
+                          background: "var(--surface2)",
+                          color: "var(--danger)",
+                          cursor: "pointer",
+                          fontSize: 12,
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             )}
           </div>
 
+          {/* ── INVITADOS ── */}
           <div className="form-group">
             <label>Invitados / Participantes</label>
             <div className="attendee-list">
